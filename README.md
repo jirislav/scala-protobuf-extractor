@@ -14,3 +14,43 @@ It might be used with success in high throughput applications (e.g. metrics extr
   - https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/wire-format
 - Reading Byte Stream
   - https://developers.google.com/protocol-buffers/docs/reference/csharp/class/google/protobuf/coded-input-stream
+
+## Usage
+
+```scala
+
+// First, get the PB field descriptor
+val fieldDescriptor = YourGeneratedMessageV3.Builder.getDescriptor.findFieldByName("fieldName")
+
+// And provide the input stream (holding the bytes with the message definition) to method for particular field type extraction
+val serializedBoolean = FieldExtractor.extractBool(
+  codedInputStream,
+  fieldDescriptor.getNumber
+)
+```
+
+### Gradle
+
+```gradle
+dependencies {
+    // ...
+
+    // Scala 2.13
+    implementation 'cz.jkozlovsky:scala-protobuf-field-extractor_2.13:0.1.0'
+
+    // Scala 2.12
+    implementation 'cz.jkozlovsky:scala-protobuf-field-extractor_2.12:0.1.0'
+
+    // ...
+}
+```
+
+### Sbt
+
+```sbt
+// Scala 2.13
+libraryDependencies += cz.jkozlovsky % scala-protobuf-field-extractor_2.13 % 0.1.0
+
+// Scala 2.12
+libraryDependencies += cz.jkozlovsky % scala-protobuf-field-extractor_2.12 % 0.1.0
+```
