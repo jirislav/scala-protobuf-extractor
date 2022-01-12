@@ -7,7 +7,7 @@ import org.scalatestplus.junit.JUnitRunner
 import protobuf_unittest.Unittest.TestAllTypes
 
 import java.io.{PipedInputStream, PipedOutputStream}
-import scala.jdk.CollectionConverters._
+import collection.JavaConverters._
 
 @RunWith(classOf[JUnitRunner])
 class FieldExtractorTest extends AnyFlatSpec {
@@ -21,7 +21,7 @@ class FieldExtractorTest extends AnyFlatSpec {
     .setOptionalInt64(10000L)
     .setOptionalBool(true)
     .addAllRepeatedBool(List(true, false, true).map(_.asInstanceOf[java.lang.Boolean]).asJava)
-    .build();
+    .build()
 
   final val DefaultMessage = TestAllTypes.newBuilder().build()
 
