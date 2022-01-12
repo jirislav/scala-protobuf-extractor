@@ -54,7 +54,7 @@ class FieldExtractorTest extends AnyFlatSpec {
     ) == 10000L
   }
 
-  // TODO: Tag won't be find in case it is set to a default value (which means being unset in an optional field)
+  // TODO: Tag won't be found in case it is set to a default value (which means being unset in an optional field)
   //       But we actually shouldn't blindly return the default if tag not found as the tag ID might be wrong
   "extractDefaultBool" should "not fail with default values" ignore assert {
     !FieldExtractor.extractBool(
