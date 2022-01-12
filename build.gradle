@@ -80,11 +80,12 @@ artifacts {
 
 publishing {
     publications {
-        maven(MavenPublication) {
+        mavenJava(MavenPublication) {
             artifactId = rootProject.name
             from components.java
             artifact sourcesJar
             artifact javadocJar
+
 
             versionMapping {
                 usage('java-api') {
@@ -99,10 +100,6 @@ publishing {
                 description = 'Fast Protobuf field extractor written in Scala. Its purpose is to read fast a given tag from serialized message without the need to deserialize whole message.'
                 url = 'https://github.com/jirislav/scala-protobuf-extractor'
                 packaging = 'jar'
-                signing {
-//                    sign publishing.publications.release
-                    sign configurations.archives
-                }
                 licenses {
                     license {
                         name = 'GNU General Public License v2.0'
@@ -134,4 +131,8 @@ publishing {
             }
         }
     }
+}
+
+signing {
+    sign publishing.publications.mavenJava
 }
