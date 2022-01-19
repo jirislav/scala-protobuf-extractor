@@ -43,10 +43,10 @@ dependencies {
     // ...
 
     // Scala 2.13
-    implementation 'cz.jkozlovsky:scala-protobuf-field-extractor_2.13:0.1.0'
+    implementation 'cz.jkozlovsky:scala-protobuf-field-extractor_2.13:1.0.0'
 
     // Scala 2.12
-    implementation 'cz.jkozlovsky:scala-protobuf-field-extractor_2.12:0.1.0'
+    implementation 'cz.jkozlovsky:scala-protobuf-field-extractor_2.12:1.0.0'
 
     // ...
 }
@@ -56,8 +56,8 @@ dependencies {
 
 ```sbt
 // Scala 2.13
-libraryDependencies += cz.jkozlovsky % scala-protobuf-field-extractor_2.13 % 0.1.0
+libraryDependencies += cz.jkozlovsky % scala-protobuf-field-extractor_2.13 % 1.0.0
 
 // Scala 2.12
-libraryDependencies += cz.jkozlovsky % scala-protobuf-field-extractor_2.12 % 0.1.0
+libraryDependencies += cz.jkozlovsky % scala-protobuf-field-extractor_2.12 % 1.0.0
 ```
