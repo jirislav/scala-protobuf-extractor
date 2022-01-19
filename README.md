@@ -23,9 +23,16 @@ It might be used with success in high throughput applications (e.g. metrics extr
 val fieldDescriptor = YourGeneratedMessageV3.Builder.getDescriptor.findFieldByName("fieldName")
 
 // And provide the input stream (holding the bytes with the message definition) to method for particular field type extraction
-val serializedBoolean = FieldExtractor.extractBool(
+val staticallyExtracted = FieldExtractor.staticExtract(
   codedInputStream,
-  fieldDescriptor.getNumber
+  fieldDescriptor,
+  _.readBool()
+)
+
+// With dynamic extraction, you have to provide the expected type, otherwise, AnyRef will be returned by default
+val dynamicallyExtracted: Boolean = FieldExtractor.dynamicExtract(
+  codedInputStream,
+  fieldDescriptor
 )
 ```
 

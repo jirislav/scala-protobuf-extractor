@@ -3,39 +3,73 @@
  */
 package cz.jkozlovsky.scala.protobuf.field.extractor
 
+import com.google.protobuf.Descriptors.FieldDescriptor
 import com.google.protobuf._
 
 import java.io.InputStream
 import java.nio.ByteBuffer
-import scala.language.implicitConversions
-
 
 object FieldExtractor {
 
-  case class TagNotFoundException(tagId: Int) extends Exception(s"The tagId '$tagId' was not found within the provided inputStream.")
+  /** Calling this before extraction should enable the unsafe mode within the JVM, making it possible
+    * to further speed up the extraction process in some cases. */
+  def enableUnsafe(): Unit = classOf[sun.misc.Unsafe]
+    .getDeclaredField("theUnsafe")
+    .setAccessible(true)
 
-  /** Calling this should enable the unsafe mode, making it possible to further speed up the extraction process. */
-  def enableUnsafe: sun.misc.Unsafe = {
-    val f = classOf[sun.misc.Unsafe].getDeclaredField("theUnsafe")
-    f.setAccessible(true)
-    val unsafe = f.get(null).asInstanceOf[sun.misc.Unsafe]
-    unsafe
-  }
-
-  /** Extracts the provided field by specifying its tag & extractor method. */
-  protected def extract[T](codedInputStream: CodedInputStream, tagId: Int, extractionMethod: () => T): T = {
+  /** Extracts the provided field statically.
+    *
+    * This means that you have to explicitly provide an extraction method for the requested data type, but since it
+    * will be directly compiled as an argument, it should be actually faster than using the dynamic approach.
+    */
+  def staticExtract[T](codedInputStream: CodedInputStream, fieldDescriptor: FieldDescriptor, extractionMethod: CodedInputStream => T): T = {
     while (!codedInputStream.isAtEnd) {
-      if (WireFormat.getTagFieldNumber(codedInputStream.readTag()) == tagId) {
-        return extractionMethod.apply()
+      if (WireFormat.getTagFieldNumber(codedInputStream.readTag()) == fieldDescriptor.getNumber) {
+        return extractionMethod.apply(codedInputStream)
       } else codedInputStream.skipField(codedInputStream.getLastTag)
     }
-    // TODO: Tag won't be find in case it is set to a default value (which means being unset in an optional field)
-    //       But we actually shouldn't blindly return the default if tag not found as the tag ID might be wrong
-    throw TagNotFoundException(tagId)
+    fieldDescriptor.getDefaultValue.asInstanceOf[T]
+  }
+
+  /** Extracts the provided field dynamically.
+    *
+    * This means that we dynamically create an extraction method, which is then used for static extraction.
+    *
+    * This approach might create unnecessary overhead during extractor creation, but it should be noticeable only during
+    * parsing of the first message, since we store the extractor in an final implicit class value.
+    */
+  def dynamicExtract[T](codedInputStream: CodedInputStream, fieldDescriptor: FieldDescriptor): T = staticExtract(
+    codedInputStream, fieldDescriptor, fieldDescriptor.extractor
+  ).asInstanceOf[T]
+
+  implicit class WithFieldDescriptor(fieldDescriptor: FieldDescriptor) {
+    final val extractor: CodedInputStream => AnyRef = fieldDescriptor.getType match {
+      case FieldDescriptor.Type.BOOL => (codedInputStream: CodedInputStream) => codedInputStream.readBool().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.BYTES => (codedInputStream: CodedInputStream) => codedInputStream.readBytes().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.DOUBLE => (codedInputStream: CodedInputStream) => codedInputStream.readDouble().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.ENUM => (codedInputStream: CodedInputStream) => codedInputStream.readEnum().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.FIXED32 => (codedInputStream: CodedInputStream) => codedInputStream.readFixed32().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.FIXED64 => (codedInputStream: CodedInputStream) => codedInputStream.readFixed64().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.FLOAT => (codedInputStream: CodedInputStream) => codedInputStream.readFloat().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.GROUP => throw new UnsupportedOperationException("Extraction of group is not supported with dynamic extraction.")
+      case FieldDescriptor.Type.INT32 => (codedInputStream: CodedInputStream) => codedInputStream.readInt32().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.INT64 => (codedInputStream: CodedInputStream) => codedInputStream.readInt64().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.MESSAGE => throw new UnsupportedOperationException("Extraction of message is not supported with dynamic extraction.")
+      case FieldDescriptor.Type.SFIXED32 => (codedInputStream: CodedInputStream) => codedInputStream.readSFixed32().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.SFIXED64 => (codedInputStream: CodedInputStream) => codedInputStream.readSFixed64().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.SINT32 => (codedInputStream: CodedInputStream) => codedInputStream.readSInt32().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.SINT64 => (codedInputStream: CodedInputStream) => codedInputStream.readSInt64().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.STRING => (codedInputStream: CodedInputStream) => codedInputStream.readString().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.UINT32 => (codedInputStream: CodedInputStream) => codedInputStream.readUInt32().asInstanceOf[AnyRef]
+      case FieldDescriptor.Type.UINT64 => (codedInputStream: CodedInputStream) => codedInputStream.readUInt64().asInstanceOf[AnyRef]
+    }
   }
 
   /** Use with caution, it might unintentionally slow down the whole extraction process if used unwisely. */
   object WithImplicitCodedInputStream {
+
+    import scala.language.implicitConversions
+
     implicit def codeInputStream(inputStream: InputStream): CodedInputStream = CodedInputStream.newInstance(inputStream)
 
     implicit def codeByteBuffer(byteBuffer: ByteBuffer): CodedInputStream = CodedInputStream.newInstance(byteBuffer)
@@ -44,63 +78,4 @@ object FieldExtractor {
 
     implicit def codeIterableOfByteBuffer(byteBuffers: java.lang.Iterable[ByteBuffer]): CodedInputStream = CodedInputStream.newInstance(byteBuffers)
   }
-
-  def extractBool(codedInputStream: CodedInputStream, tagId: Int): Boolean = extract(codedInputStream, tagId, () => codedInputStream.readBool())
-
-  def extractBytes(codedInputStream: CodedInputStream, tagId: Int): ByteString = extract(codedInputStream, tagId, () => codedInputStream.readBytes())
-
-  def extractByteArray(codedInputStream: CodedInputStream, tagId: Int): Array[Byte] = extract(codedInputStream, tagId, () => codedInputStream.readByteArray())
-
-  def extractByteBuffer(codedInputStream: CodedInputStream, tagId: Int): ByteBuffer = extract(codedInputStream, tagId, () => codedInputStream.readByteBuffer())
-
-  def extractDouble(codedInputStream: CodedInputStream, tagId: Int): Double = extract(codedInputStream, tagId, () => codedInputStream.readDouble())
-
-  def extractEnum(codedInputStream: CodedInputStream, tagId: Int): Int = extract(codedInputStream, tagId, () => codedInputStream.readEnum())
-
-  def extractFixed32(codedInputStream: CodedInputStream, tagId: Int): Int = extract(codedInputStream, tagId, () => codedInputStream.readFixed32())
-
-  def extractFixed64(codedInputStream: CodedInputStream, tagId: Int): Long = extract(codedInputStream, tagId, () => codedInputStream.readFixed64())
-
-  def extractFloat(codedInputStream: CodedInputStream, tagId: Int): Float = extract(codedInputStream, tagId, () => codedInputStream.readFloat())
-
-  def extractGroup(codedInputStream: CodedInputStream, tagId: Int, builder: MessageLite.Builder, extensionRegistry: ExtensionRegistryLite): Unit = extract(codedInputStream, tagId, () => codedInputStream.readGroup(tagId, builder, extensionRegistry))
-
-  def extractGroup[T <: MessageLite](codedInputStream: CodedInputStream, tagId: Int, parser: Parser[T], extensionRegistry: ExtensionRegistryLite): T = extract(codedInputStream, tagId, () => codedInputStream.readGroup(tagId, parser, extensionRegistry))
-
-  def extractInt32(codedInputStream: CodedInputStream, tagId: Int): Int = extract(codedInputStream, tagId, () => codedInputStream.readInt32())
-
-  def extractInt64(codedInputStream: CodedInputStream, tagId: Int): Long = extract(codedInputStream, tagId, () => codedInputStream.readInt64())
-
-  def extractMessage(codedInputStream: CodedInputStream, tagId: Int, builder: MessageLite.Builder, extensionRegistry: ExtensionRegistryLite): Unit = extract(codedInputStream, tagId, () => codedInputStream.readMessage(builder, extensionRegistry))
-
-  def extractMessage[T <: MessageLite](codedInputStream: CodedInputStream, tagId: Int, parser: Parser[T], extensionRegistry: ExtensionRegistryLite): T = extract(codedInputStream, tagId, () => codedInputStream.readMessage(parser, extensionRegistry))
-
-  def extractRawByte(codedInputStream: CodedInputStream, tagId: Int): Byte = extract(codedInputStream, tagId, () => codedInputStream.readRawByte())
-
-  def extractRawBytes(codedInputStream: CodedInputStream, tagId: Int, length: Int): Array[Byte] = extract(codedInputStream, tagId, () => codedInputStream.readRawBytes(length))
-
-  def extractRawLittleEndian32(codedInputStream: CodedInputStream, tagId: Int): Int = extract(codedInputStream, tagId, () => codedInputStream.readRawLittleEndian32())
-
-  def extractRawLittleEndian64(codedInputStream: CodedInputStream, tagId: Int): Long = extract(codedInputStream, tagId, () => codedInputStream.readRawLittleEndian64())
-
-  def extractRawVarint32(codedInputStream: CodedInputStream, tagId: Int): Int = extract(codedInputStream, tagId, () => codedInputStream.readRawVarint32())
-
-  def extractRawVarint64(codedInputStream: CodedInputStream, tagId: Int): Long = extract(codedInputStream, tagId, () => codedInputStream.readRawVarint64())
-
-  def extractSFixed32(codedInputStream: CodedInputStream, tagId: Int): Int = extract(codedInputStream, tagId, () => codedInputStream.readSFixed32())
-
-  def extractSFixed64(codedInputStream: CodedInputStream, tagId: Int): Long = extract(codedInputStream, tagId, () => codedInputStream.readSFixed64())
-
-  def extractSInt32(codedInputStream: CodedInputStream, tagId: Int): Int = extract(codedInputStream, tagId, () => codedInputStream.readSInt32())
-
-  def extractSInt64(codedInputStream: CodedInputStream, tagId: Int): Long = extract(codedInputStream, tagId, () => codedInputStream.readSInt64())
-
-  def extractString(codedInputStream: CodedInputStream, tagId: Int): String = extract(codedInputStream, tagId, () => codedInputStream.readString())
-
-  def extractStringRequireUtf8(codedInputStream: CodedInputStream, tagId: Int): String = extract(codedInputStream, tagId, () => codedInputStream.readStringRequireUtf8())
-
-  def extractUInt32(codedInputStream: CodedInputStream, tagId: Int): Int = extract(codedInputStream, tagId, () => codedInputStream.readUInt32())
-
-  def extractUInt64(codedInputStream: CodedInputStream, tagId: Int): Long = extract(codedInputStream, tagId, () => codedInputStream.readUInt64())
-
 }

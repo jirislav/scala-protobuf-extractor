@@ -21,7 +21,7 @@ class FieldExtractorTest extends AnyFlatSpec {
     .setOptionalInt64(10000L)
     .setOptionalBool(true)
     .addAllRepeatedBool(List(true, false, true).map(_.asInstanceOf[java.lang.Boolean]).asJava)
-    .build();
+    .build()
 
   final val DefaultMessage = TestAllTypes.newBuilder().build()
 
@@ -33,33 +33,63 @@ class FieldExtractorTest extends AnyFlatSpec {
     CodedInputStream.newInstance(in)
   }
 
-  "extractBool" should "be working" in assert {
-    FieldExtractor.extractBool(
+  "staticExtract" should "be working with bool" in assert {
+    FieldExtractor.staticExtract(
       createCodedInputStream(BasicMessage),
-      OptionalBoolFieldDescriptor.getNumber
+      OptionalBoolFieldDescriptor,
+      _.readBool()
     )
   }
 
-  "extractInt" should "be working" in assert {
-    FieldExtractor.extractInt32(
+  it should "be working with int32" in assert {
+    FieldExtractor.staticExtract(
       createCodedInputStream(BasicMessage),
-      OptionalInt32FieldDescriptor.getNumber
+      OptionalInt32FieldDescriptor,
+      _.readInt32()
     ) == 1000
   }
 
-  "extractLong" should "be working" in assert {
-    FieldExtractor.extractInt64(
+  it should "be working with int64" in assert {
+    FieldExtractor.staticExtract(
       createCodedInputStream(BasicMessage),
-      OptionalInt64FieldDescriptor.getNumber
+      OptionalInt64FieldDescriptor,
+      _.readInt64()
     ) == 10000L
   }
 
-  // TODO: Tag won't be found in case it is set to a default value (which means being unset in an optional field)
-  //       But we actually shouldn't blindly return the default if tag not found as the tag ID might be wrong
-  "extractDefaultBool" should "not fail with default values" ignore assert {
-    !FieldExtractor.extractBool(
+  it should "not fail with default values" in assert {
+    !FieldExtractor.staticExtract(
       createCodedInputStream(DefaultMessage),
-      OptionalBoolFieldDescriptor.getNumber
+      OptionalBoolFieldDescriptor,
+      _.readBool()
+    )
+  }
+
+  "dynamicExtract" should "be working with bool" in assert {
+    FieldExtractor.dynamicExtract[Boolean](
+      createCodedInputStream(BasicMessage),
+      OptionalBoolFieldDescriptor
+    )
+  }
+
+  it should "be working with int32" in assert {
+    FieldExtractor.dynamicExtract[Int](
+      createCodedInputStream(BasicMessage),
+      OptionalInt32FieldDescriptor
+    ) == 1000
+  }
+
+  it should "be working with int64" in assert {
+    FieldExtractor.dynamicExtract[Long](
+      createCodedInputStream(BasicMessage),
+      OptionalInt64FieldDescriptor
+    ) == 10000L
+  }
+
+  it should "not fail with default values" in assert {
+    !FieldExtractor.dynamicExtract[Boolean](
+      createCodedInputStream(DefaultMessage),
+      OptionalBoolFieldDescriptor
     )
   }
 }
